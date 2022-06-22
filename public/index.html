@@ -1,0 +1,268 @@
+<!-- firebase version of the beagairbheag indexeddb webapp. To deploy, start powershell in the bablite
+    `public folder and then enter firebase deploy --only hosting -->
+
+<!-- todo
+  need to display spinner when moving audio
+  need to display spinner when building programme info 
+  check for existing note before inserting
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>BabWebApp</title>
+
+  <style>
+    .audiobutton {
+      height: 2rem;
+      width: 2rem;
+      border: none;
+      background-size: 60% 60%;
+      background-color: white;
+      background-repeat: no-repeat;
+      background-position: center;
+      outline: none;
+    }
+
+    .progressBar {
+      --thumbColor: blue;
+      --thumbWidth: 1.0rem;
+      height: var(--thumbWidth);
+      /*  This style declares variables such as thumbColor that allow us to access style settings
+          easily in javascript and also to pass them to settings in the special "before" styles
+          that provide styling to accommodate specific browser and device type
+          see https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties.
+          The original ideas came from https://www.youtube.com/watch?v=sqpg1qzJCGQ&ab_channel=SelfTeachMe */
+    }
+
+    .progressBar::-webkit-slider-thumb {
+      /* thumb - chrome and safari */
+      -webkit-appearance: none;
+      height: var(--thumbWidth);
+      width: var(--thumbWidth);
+      border-radius: 50%;
+      border: none;
+      background-color: var(--thumbColor);
+      cursor: pointer;
+
+    }
+
+    .scroll-touch {
+      -webkit-overflow-scrolling: touch;
+      /* activate touch-scrolling on iphone */
+    }
+
+    .picker {
+      font-size: 1rem;
+      /* explicit styling for select elements, stops iphone layout re-sizing when picker displayed */
+    }
+
+    .babbutton {
+      font-size: 1.25rem;
+      border: 1px solid black;
+      border-radius: 5px;
+      background: aquamarine;
+    }
+
+    .babinput {
+      font-size: 1rem;
+    }
+  </style>
+
+  <link rel="shortcut icon" href="https://ngatesystems.com/beagairbheag/bab.png">
+
+</head>
+
+<body style="margin: 0px; font-size: 1rem;">
+
+  <!--HTML5 audio-->
+  <audio id="audioelement" preload="metadata" type="audio/mpeg">
+    <!-- "preload" fixes iphone problem - see https://stackoverflow.com/questions/18266437/html5-video-currenttime-not-setting-properly-on-iphone
+          according to w3schools, this means "The author thinks that the browser should load only metadata when the page loads",
+          the alternatives are "none" (don't load the audio file) and "auto" (load the entire audio file) -->
+  </audio>
+
+  <div id="page1" style="display: none; width: 100%; text-align: center; font-size: 1rem;">
+
+    <img id="logo" style="width: 20rem; max-width:100%; padding: 1rem; border: 1px solid black; margin-top: 2rem;"
+      src="/assets/images/logo.png" alt="Beag Air Bheag Companion logo">
+
+
+
+    <form id="userloginform" autocomplete="on" style="margin-top: 3rem;">
+      <div>
+        <label for="loginemail">Email</label>
+        <!-- desperate tweak to stop keyboard popping up on ios when field takes focus (blur() doesn't work on ios, it seems-->
+        <input type="email" id="loginemail" class="babinput" autocomplete="username" inputmode="none"
+          onclick="document.getElementById('loginemail').inputMode='email';">
+      </div>
+      <div style="margin-top: 1rem;">
+        <label for="loginpassword">Password</label>
+        <input type="password" id="loginpassword" class="babinput" autocomplete="current-password" tabindex="-1">
+      </div>
+      <p style="margin-top: 1rem;">
+        <button type="button" id="loginbutton" class="babbutton">Login</button>
+      </p>
+      <p style="margin-top: 2rem;">Not yet registered?</p>
+      <p style="margin-top: 1rem;">
+        <button type="button" class="babbutton"
+          onclick="document.getElementById('userregistrationform').style.display='block'; document.getElementById('userloginform').style.display='none';">Register</button>
+      </p>
+
+    </form>
+
+    <form id="userregistrationform" autocomplete="on" style="display: none;">
+      <div style="margin-top: 1rem;">
+        <label for="registrationemail">Email</label>
+        <input type="email" id="registrationemail" class="babinput" autocomplete="username">
+      </div>
+      <div style="margin-top: 1rem;">
+        <label for="registrationpassword">Password</label>
+        <input type="password" id="registrationpassword" class="babinput" autocomplete="current-password" s>
+      </div>
+      <p style="margin-top: 1rem;">
+        <button type="button" id="submitbutton" class="babbutton">Submit</button>&nbsp;&nbsp;&nbsp;
+        <button type="button" class="babbutton"
+          onclick="document.getElementById('userloginform').style.display='block'; document.getElementById('userregistrationform').style.display='none';">Cancel</button>
+      </p>
+    </form>
+
+  </div>
+
+  <div id="page2" style="display: none; position: fixed; width: 100%; top: 0; left: 0;">
+
+    <form>
+      <div id="programmeblock" style="font-weight: bold; text-align: center; margin-top: .5rem;">
+        <span id="seriespicklistspan"></span>&nbsp;&nbsp;
+        <span id="episodespicklistspan"></span>
+      </div>
+    </form>
+
+    <div id="controlblock" style="display: flex; justify-content: center; margin-top: .5rem;">
+
+      <div style="border-style: solid; border-width: thin; border-radius: 8px;">
+        <div style="display: inline-flex; align-items: center;">
+          <div style="margin-left: 1vw;">
+            <button id="pbutton" class="audiobutton" style="background-image: url('/assets/images/play.png');"
+              title="Start or stop the audio-player"></button>
+            <button id="rbutton" class="audiobutton" style="background-image: url('/assets/images/rplay.png');"
+              title="D&egrave; thuirt e? - Rewind the audio-player 5 seconds and restart (alternatively use scroll wheel over thumb)"></button>
+            <button id="nbutton" class="audiobutton" style="background-image: url('/assets/images/shriek.png');"
+              title="Create a note"></button>
+          </div>
+          <div style="padding: 0 2vw 0 1vw;">
+            <span id="currenttime">00:00:00</span>/
+            <span id="finishtime"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="playerblock"
+      style="width: 95%; padding-left: .25rem; padding-right: .25rem; margin: .5rem auto 0 auto; border: solid; box-sizing: border-box;">
+
+      <!-- First the playline - Note that we use "oninput" rather than "onchange" to signal movement on the thumb
+           as the latter only fires when it loses focus and so we lose the ability to show changes while the user
+           drags the thumb-->
+
+      <div>
+        <!-- playline.value  take values from 0 (default min) to a dynamically-set max value of currentAudioDuration
+           in steps of .00001 (ie values will be rounded to nearest .00001) -->
+        <input id="playline" type="range" step=".00001" value="0" style="width: 100%; margin: .5rem 0 0 0;"
+          class="progressBar" />
+      </div>
+
+      <!-- Then the Texts line.  -->
+
+      <div id="textsline" style="height:1.25rem; margin-bottom: .5rem;">
+      </div>
+    </div>
+
+    <!-- Then a tools block-->
+
+    <div id="toolsblock" style="display: flex; justify-content: space-around; margin-top: .5rem;">
+      <button id="jotterbutton">Jotter</button>
+      <button id="searchbutton">Search</button>
+      <button id="dictionarybutton">Dictionary</button>
+      <button id="translatebutton">Translate</button>
+      <button id="aboutbutton">About</button>
+    </div>
+
+    <!-- Then the general display panel, populated as required. -->
+
+    <div id="generaldisplayblock" class="scroll-touch"
+      style="width: 95%; box-sizing: border-box; margin: .5rem auto 0 auto;  padding: 1rem; border: solid; overflow-y: auto; ">
+    </div>
+
+    <!--And finally, "floating components" of the GDP - a spinner and a button to "regress" the GDPs.  
+        Note that attempts to use an animated spinner seemed to kill safari on an iphone - overkill 
+        anyway at present. Dynamic styling of these components is provided via positionGDPElements()  -->
+
+    <div id="spinner" style="position: fixed; width: 100%; z-index: 10; text-align: center;">
+      <p style="display: inline-block; background-color: aquamarine; padding:2rem 5rem 2rem 5rem;">Loading</p>
+    </div>
+
+    <div>
+      <button id="regressgdpbutton" style="display: none; position: fixed; z-index: 20;"">X</button>
+    </div>
+
+    <div id="jottercontrols"
+        style="display: none; position: fixed; width: 100%; justify-content: center; align-items: center; z-index: 10; ">
+        <button id="jottersavebutton" style="margin: 0 2em 0 2em;">Save</button>
+    </div>
+
+  </div>
+
+  <script src="packed_index.js"></script>
+
+  <script>
+
+    // The searchWord function z() is left out of the index.js module because otherwise we'd have to create bindings
+    // for each link. This in turn would mean we'd have to give them ids and so the whole thing would become hopelessly
+    // complex and bloated. Fortunately, however, we don't need to do any of this because z() doesn't contain any
+    // firebase stuff and so doesn't need to be in the index.js module at all
+
+    function z(searchWord) {
+
+      if (typeof (searchWord) != 'string') searchWord = ""; // covers the case where the dictionary is called without an argument
+
+      // There's a wee snag - despite best efforts, some html is still ending up in searchWord - typically 
+      // </strong> and </em>. As a quick fix, remove these
+
+      //searchWord = searchWord.replace("</strong>", "");
+      //searchWord = searchWord.replace("</em>", "");
+
+      // launch the current dictionary and address the searchword. A "cryptic" function name is used in order to
+      // minimize the impact of the anchor annotations on the length of the text record
+
+      // There seem to be three ways of doing this - and they're all flawed! 
+
+      // Method 1 : window.open into a named window. On PC an unknown factor makes the dictionary and the Translator behave
+      // differently. Once a dictionary tab is open, successive dictionary clicks go into the same window. The Translator, on
+      // the other hand always creates a new tab. On the iphone, one click of the back-arrow returns from the translator, but
+      // to get back from the dictionary you need two clicks. Attempts to size and position the window are, naturally, 
+      // ignored.
+
+      // Method 2 : href on an anchor element. On the PC, the translator always opens a new tab (unless you're using _self, 
+      // and this is a really bad idea because pressing the back-arrow has ou logging in again). On the iphone, however, this
+      // works beautifully.
+
+      // Method 3 : open in iframe. This more or less works for the dictionary, though the site displays a cookie wwarning
+      // every time you access it and the content "wobbles" when you scroll it. But iframes are a no-no for the translator
+      // because this has a "same origin" requirement in its header and it just won't display in an iframe
+      // On balance, a window.open (method 1) seems least bad.
+
+      var dictionaryWindow = window.open("https://learngaelic.scot/dictionary/index.jsp?abairt=" + searchWord + "&slang=gd&wholeword=false", "BBCDictionary");
+
+    }
+
+  </script>
+
+</body>
+
+</html>

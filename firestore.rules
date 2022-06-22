@@ -1,0 +1,44 @@
+// Allow read access on all documents to any user signed in to the application
+// Allow write on all only to signed-in administrator, apart from userJotter and userNotes
+// where signed-in users can also write to their own records
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /programmeTexts/{document=**} {
+      allow read : if true;
+      allow write : if request.auth != null && request.auth.token.email  == "samuil.johnson@yahoo.com";
+    }
+    
+    match /programmes/{document=**} {
+      allow read : if true;
+      allow write : if request.auth != null && request.auth.token.email  == "samuil.johnson@yahoo.com";
+    }
+  
+    match /textTypes/{document=**} {
+      allow read : if true;
+      allow write : if request.auth != null && request.auth.token.email  == "samuil.johnson@yahoo.com";
+    }
+    
+     match /userJotter/{document=**} {
+       allow read, create : if request.auth != null;
+       allow write : if request.auth != null && request.auth.token.email  == resource.data.email;
+    }
+   
+     match /userNotes/{document=**} {
+       allow read, create : if request.auth != null 
+       allow write : if request.auth != null && request.auth.token.email  == resource.data.email;
+    }
+    
+     match /recoverableCollectionLogs/{document=**} {
+       allow read, create : if request.auth != null 
+       allow write : if request.auth != null && request.auth.token.email  == resource.data.email;
+    }
+    
+  //  match /{document=**} {
+  //   allow read, write: if request.auth != null;
+  //  }  
+    
+  }
+}

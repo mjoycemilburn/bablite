@@ -1,0 +1,59 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "programmes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "seriesNum",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "firstOnDate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "programmeTexts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "episodeNam",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "seriesNum",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startTimeInProgramme",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "userNotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "email",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "episodeNam",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "seriesNum",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "noteSeconds",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
